@@ -90,80 +90,45 @@ t3 <- limma::topTable(fit, coef=2, n=nrow(rma.subset), adjust='BH')
 # Filtering for DEs
 library(dplyr)
 beta_genes <- t1 %>% 
-  dplyr::filter(P.Value<0.05)
+  dplyr::filter(adj.P.Val<0.05)
 econ_genes <- t2 %>% 
-  dplyr::filter(P.Value<0.05)
+  dplyr::filter(adj.P.Val<0.05)
 thio_genes <- t3 %>% 
-  dplyr::filter(P.Value<0.05)
+  dplyr::filter(adj.P.Val<0.05)
 
-
-# ProbeID --> Genes -------------------------------------------------------
-# (copied from DEG_concordance, modified slightly)
-## Functions
-affy_to_refseq <- function(x){ 
-  refseq <- refseq_mapping %>% 
-    dplyr::filter(PROBEID == x) # uses probe ID
-  refseq <- refseq[,1]
-  if(length(refseq)!= 1){
-    refseq <- NA
-    return(refseq)
-  } 
-  else if(length(refseq) == 1){
-    return(refseq)
-  }
-}
-refseq_to_gene <- function(x){ 
-  if(is.na(x)==FALSE){
-    gene <- refseq_mapping %>% 
-      dplyr::filter(REFSEQ == x) # uses refseq ID
-    gene <- unique(gene[,3])
-    return(gene) 
-  } else{
-    return(NA)
-  }
-}
-
-# Affy_map
-refseq_mapping <- read.csv("/project/bf528/project_3/refseq_affy_map.csv")
-refseq_mapping <- as.data.frame(refseq_mapping) # Mapping probesets / refseq IDs to genes
-
-# Getting the DEGs
-## Beta-naphthoflavone
-beta_genes$REFSEQ <- sapply(rownames(beta_genes), affy_to_refseq, USE.NAMES = F)
-beta_genes$Genes <- sapply(beta_genes$REFSEQ, refseq_to_gene, USE.NAMES = F)
-
-## Econazole
-econ_genes$REFSEQ <- sapply(rownames(econ_genes), affy_to_refseq, USE.NAMES = F)
-econ_genes$Genes <- sapply(econ_genes$REFSEQ, refseq_to_gene, USE.NAMES = F)
-
-## Thioacetamide
-thio_genes$REFSEQ <- sapply(rownames(thio_genes), affy_to_refseq, USE.NAMES = F)
-thio_genes$Genes <- sapply(thio_genes$REFSEQ, refseq_to_gene, USE.NAMES = F)
 
 # Deliverables -----------------------------------------------------------
 ## 1. "A report of the number of DE genes at p-adjust < 0.05"
-beta_n <- length(unique(na.omit(beta_genes$Genes))) # 1752 genes
-econ_n <- length(unique(na.omit(econ_genes$Genes))) # 3114 genes
-thio_n <- length(unique(na.omit(thio_genes$Genes))) # 4797 genes
+beta_n <- nrow(beta_genes) # 3090 "genes"
+econ_n <- nrow(econ_genes) # 5837 genes
+thio_n <- nrow(thio_genes) # 8828 genes
+
+beta_n0 <- nrow(t1) - beta_n
+econ_n0 <- nrow(t2) - econ_n
+thio_n0 <- nrow(t3) - thio_n
+
+# report for number of DEGs
+sig_g <- matrix(c(beta_n0, econ_n0, thio_n0, beta_n, econ_n, thio_n),ncol=2, nrow=3)
+colnames(sig_g) <- c("FALSE", "TRUE")
+rownames(sig_g) <- c('NAP', 'ECO', 'THI')
+
+write.csv(sig_g, 'DEG_limma_report.csv')
 
 ## 2. "A table of the top 10 DE genes from each of your analyses"
 beta_t10 <- beta_genes %>% 
-  filter(!is.na(Genes)) %>% 
-  arrange(P.Value) %>% 
+  arrange(adj.P.Val) %>% 
   top_n(10)
 econ_t10 <- econ_genes %>% 
-  filter(!is.na(Genes)) %>% 
-  arrange(P.Value) %>% 
+  arrange(adj.P.Val) %>% 
   top_n(10)
 thio_t10 <- thio_genes %>% 
-  filter(!is.na(Genes)) %>% 
-  arrange(P.Value) %>% 
+  arrange(adj.P.Val) %>% 
   top_n(10)
 
 # Writing them out
-# write.csv(beta_t10,'beta_t10.csv')
-# write.csv(econ_t10,'econ_t10.csv')
-# write.csv(thio_t10,'thio_t10.csv')
+write.csv(beta_t10,'beta_t10.csv')
+write.csv(econ_t10,'econ_t10.csv')
+write.csv(thio_t10,'thio_t10.csv')
 
 ## 3. "Histograms of fold change values and scatter plots of fold change vs nominal-pvalue from the significant DE genes"
 jpeg("histograms.jpeg")
